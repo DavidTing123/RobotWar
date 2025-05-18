@@ -1,5 +1,5 @@
 /**********|**********|**********|
-Program: main.cpp / MovingRobot.h
+Program: MovingRobot.cpp / MovingRobot.h
 Course: OOPDS
 Trimester: 2510
 Name: Bradley Ben Lee, David Ting Zi Xiang, Esvan Rao A/L Perasath Raw
@@ -35,12 +35,6 @@ private:
     string name;   // Name of the robot
     int speed;     // Speed of the robot
     bool isMoving; // Flag to check if the robot is moving
-};
-
-class Animal
-{
-public:
-    void eat();
 };
 
 #endif // MOVING_H

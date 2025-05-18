@@ -1,5 +1,5 @@
 /**********|**********|**********|
-Program: main.cpp / Robot.h
+Program: Robot.cpp / Robot.h
 Course: OOPDS
 Trimester: 2510
 Name: Bradley Ben Lee, David Ting Zi Xiang, Esvan Rao A/L Perasath Raw

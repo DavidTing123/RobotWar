@@ -3,8 +3,8 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**",
-                "${workspaceFolder}/Core/include"
+                "${workspaceFolder}/**"
+                // "${workspaceFolder}/Core/include" // Removed because directory does not exist
             ],
             "defines": [
                 "_DEBUG",
