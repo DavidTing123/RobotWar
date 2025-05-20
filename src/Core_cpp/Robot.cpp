@@ -1,16 +1,23 @@
-#include <iostream>
-#include <string>
-#include <utility> //utility for pair
-#include "include//Core//Robot.h"
-#include "include//Core//MovingRobot.h"
-#include "include//Core//ShootingRobot.h"
-#include "include//Core//ThinkingRobot.h"
-#include "include//Core//SeeingRobot.h"
+// #include <iostream>
+// #include <string>
+// #include <utility> //utility for pair
+#include "Core/Robot.h"
+// #include "include//Core//MovingRobot.h"
+// #include "include//Core//ShootingRobot.h"
+// #include "include//Core//ThinkingRobot.h"
+// #include "include//Core//SeeingRobot.h"
 using namespace std;
 
 // Constructor
 Robot::Robot(const string &robotName, int x, int y)
     : name(robotName), posX(x), posY(y), health(3) {}
+
+// Take damage
+void Robot::takeDamage()
+{
+    if (health > 0)
+        --health;
+}
 
 // Health check
 bool Robot::isAlive() const
@@ -29,10 +36,4 @@ void Robot::setPosition(int x, int y)
 pair<int, int> Robot::getPosition() const
 {
     return make_pair(posX, posY); // Return the current (x,y) position
-}
-
-int main()
-{
-    // your code here
-    return 0;
 }

@@ -1,5 +1,5 @@
 /**********|**********|**********|
-Program: main.cpp / SeeingRobot.h
+Program: Robot.cpp / SeeingRobot.h
 Course: OOPDS
 Trimester: 2510
 Name: Bradley Ben Lee, David Ting Zi Xiang, Esvan Rao A/L Perasath Raw
@@ -11,9 +11,16 @@ Phone:  01151799588, 013-352 8910, 0162025996
 **********|**********|**********/
 #ifndef SEEINGROBOT_H
 #define SEEINGROBOT_H
-#include <iostream>
-#include <string>
+// #include <iostream>
+// #include <string>
+#include "Robot.h" // Include the base class header
 
 // Add your declarations here
+class SeeingRobot : virtual public Robot
+{
+public:
+    using Robot::Robot;
+    virtual void look(int dx, int dy) = 0;
+};
 
 #endif // SEEING_H
