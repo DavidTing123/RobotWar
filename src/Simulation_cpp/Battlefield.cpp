@@ -15,7 +15,7 @@ using namespace std;
 
 Battlefield::Battlefield(int w, int h) : width(w), height(h)
 {
-    grid.resize(height, std::vector<char>(width, '.'));
+    grid.resize(height, vector<char>(width, '.'));
 }
 
 void Battlefield::clear()
