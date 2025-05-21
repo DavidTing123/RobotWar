@@ -11,9 +11,16 @@ Phone:  01151799588, 013-352 8910, 0162025996
 **********|**********|**********/
 #ifndef SHOOTING_H
 #define SHOOTING_H
-#include <iostream>
-#include <string>
+// #include <iostream>
+// #include <string>
+#include "Robot.h" // Include the base class header
 
 // Add your declarations here
+class ShootingRobot : virtual public Robot
+{
+public:
+    using Robot::Robot;
+    virtual void fire(int dx, int dy) = 0;
+};
 
 #endif // SHOOTING_H

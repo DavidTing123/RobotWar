@@ -9,3 +9,20 @@ Tutorial Section: TT1L
 Email: BRADLEY.BEN.LEE@student.mmu.edu.my, DAVID.TING.ZI@student.mmu.edu.my, esvan.rao.perasath@student.mmu.edu.my
 Phone:  01151799588, 013-352 8910, 0162025996
 **********|**********|**********/
+#pragma once
+#include <vector>
+#include <string>
+using namespace std;
+
+class Battlefield
+{
+private:
+    int width, height;
+    vector<std::vector<char>> grid;
+
+public:
+    Battlefield(int w, int h);
+    void clear();
+    void placeRobot(int x, int y, char symbol);
+    void display() const;
+};

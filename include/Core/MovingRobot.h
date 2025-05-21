@@ -11,30 +11,17 @@ Phone:  01151799588, 013-352 8910, 0162025996
 **********|**********|**********/
 #ifndef MOVINGROBOT_H
 #define MOVINGROBOT_H
-#include <iostream>
-#include <string>
+// #include <iostream>
+// #include <string>
+// #include <utility> //utility for pair
+#include "Robot.h" // Include the base class header
 using namespace std;
 
 // Add your declarations here
-class MovingRobot
+class MovingRobot : virtual public Robot
 {
 public:
-    // Constructor
-    MovingRobot(string name, int speed);
-
-    // Destructor
-    ~MovingRobot();
-
-    // Method to move the robot
-    void move(int distance);
-
-    // Method to stop the robot
-    void stop();
-
-private:
-    string name;   // Name of the robot
-    int speed;     // Speed of the robot
-    bool isMoving; // Flag to check if the robot is moving
+    using Robot::Robot;      // Inherit constructor from Robot class
+    virtual void move() = 0; // Pure virtual function for movement
 };
-
 #endif // MOVING_H

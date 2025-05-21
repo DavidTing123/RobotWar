@@ -11,9 +11,16 @@ Phone:  01151799588, 013-352 8910, 0162025996
 **********|**********|**********/
 #ifndef THINKINGROBOT_H
 #define THINKINGROBOT_H
-#include <iostream>
-#include <string>
+// #include <iostream>
+// #include <string>
+#include "Robot.h" // Include the base class header
 
 // Add your declarations here
+class ThinkingRobot : virtual public Robot
+{
+public:
+    using Robot::Robot;
+    virtual void makeDecision() = 0;
+};
 
 #endif // THINKINGROBOT_H

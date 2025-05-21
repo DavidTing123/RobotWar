@@ -37,4 +37,5 @@ public:
     bool isAlive() const;               // Checks if health > 0
     void setPosition(int x, int y);     // Updates robot's coordinates
     pair<int, int> getPosition() const; // Returns current (x,y) position
+    string getName() const;             // Returns robot's name
 };
