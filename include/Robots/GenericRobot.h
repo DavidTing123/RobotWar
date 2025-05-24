@@ -18,21 +18,29 @@ Phone:  01151799588, 013-352 8910, 0162025996
 #include "Core/ShootingRobot.h"
 #include "Core/ThinkingRobot.h"
 #include "Core/SeeingRobot.h"
-#include "Core/Robot.h"
-#include "Robots/GenericRobot.h"
+// #include "Core/Robot.h"
+// #include "Robots/GenericRobot.h"
+// #include <vector>
+using namespace std;
 
 // Add your declarations here
 class GenericRobot : public MovingRobot, public SeeingRobot, public ShootingRobot, public ThinkingRobot
 {
 public:
     GenericRobot(const std::string &name, int x, int y);
-    void think() override;
-    void act() override;
 
-    void move() override;
-    void look(int dx, int dy);
-    void fire(int dx, int dy);
-    void makeDecision() override;
+    // Implement all pure virtual functions
+    void move(int dx, int dy) override;
+    std::vector<std::vector<char>> look(int dx, int dy) override;
+    void fire(int targetX, int targetY) override;
+    void think() override;
+    
+    // Resolve the multiple inheritance ambiguity
+    char getSymbol() const override { return 'G'; }  // 'G' for GenericRobot    
+
+private:
+    // 简化战场交互（假设由Member 3实现）
+    static bool isPositionValid(int x, int y);
 };
 
 #endif // SIMULATION_H

@@ -14,28 +14,38 @@ Phone:  01151799588, 013-352 8910, 0162025996
 #include <iostream>
 #include <string>  //robot name
 #include <utility> //utility for pair
-using namespace std;
+// #include <vector>
+// using namespace std;
 
 // Add your declarations here
 class Robot
 {
+private:      // private members cannot be accessed outside this class
+    int posX; // x-coordinate of the robot
+    int posY; // y-coordinate of the robot
+
 protected: // protected members can be accessed by derived classes
-    string name;
-    int posX, posY; // current position of the coordinate
+    std::string name;
     int health = 3; // health of the robot
 
 public:
-    Robot(const string &robotName, int x, int y);
+    Robot(const std::string &robotName, int x, int y); // Constructor to initialize the robot's name and position
     virtual ~Robot() = default;
 
-    // Pure virtual functions
-    virtual void think() = 0; // Decision-making logic (where to move, whether to attack)
-    virtual void act() = 0;   // Action logic (move, attack, defend)
+    // Movement methods (cannot visit posX, posY)
+    void setPosition(int x, int y);          // Updates robot's coordinates
+    std::pair<int, int> getPosition() const; // Returns current (x,y) position
 
     // core methods
-    void takeDamage();                  // Reduces health when robot is hit
-    bool isAlive() const;               // Checks if health > 0
-    void setPosition(int x, int y);     // Updates robot's coordinates
-    pair<int, int> getPosition() const; // Returns current (x,y) position
-    string getName() const;             // Returns robot's name
+    void takeDamage();    // Reduces health when robot is hit
+    bool isAlive() const; // Checks if health > 0
+                          // void showInfo();  // 顯示資訊
+
+    // Getters
+    std::string getName() const;    // Returns robot's name
+    int getHealth() const;       // Returns robot's health
+    virtual char getSymbol() const;
+
+    void showInfo() const;
 };
+// void showInfo() const; // Show robot's information

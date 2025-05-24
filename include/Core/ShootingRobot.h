@@ -16,11 +16,33 @@ Phone:  01151799588, 013-352 8910, 0162025996
 #include "Robot.h" // Include the base class header
 
 // Add your declarations here
-class ShootingRobot : virtual public Robot
+class ShootingRobot : public virtual Robot
 {
+protected:
+    int bullet = 10; // Number of bullets available for shooting
 public:
-    using Robot::Robot;
-    virtual void fire(int dx, int dy) = 0;
+    ShootingRobot(const std::string &name, int x, int y)
+        : Robot(name, x, y) {}                       // Constructor initializing the base class
+    virtual void fire(int targetX, int targetY) = 0; // Pure virtual function for shooting
+    bool isBulletAvailable() const
+    {
+        return bullet > 0; // Check if there are bullets available
+    }
+
+    void useBullet()
+    {
+        if (isBulletAvailable())
+        {
+            --bullet;
+        }
+        else
+        {
+            while (isAlive())
+            {
+                takeDamage(); // Out of bullets = robot dies
+            }
+        }
+    }
 };
 
 #endif // SHOOTING_H

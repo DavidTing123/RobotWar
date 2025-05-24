@@ -10,7 +10,21 @@ using namespace std;
 
 // Constructor
 Robot::Robot(const string &robotName, int x, int y)
-    : name(robotName), posX(x), posY(y), health(3) {}
+    : name(robotName), posX(x), posY(y) {}
+
+// Set coordinates
+void Robot::setPosition(int x, int y)
+{
+    posX = x;
+    posY = y;
+}
+
+// Set coordinates
+pair<int, int> Robot::getPosition() const
+{
+    return make_pair(posX, posY); // Return the current (x,y) position
+    // return {posX, posY}; // C++11 style
+}
 
 // Take damage
 void Robot::takeDamage()
@@ -25,15 +39,24 @@ bool Robot::isAlive() const
     return health > 0;
 }
 
-// Set coordinates
-void Robot::setPosition(int x, int y)
+string Robot::getName() const
 {
-    posX = x;
-    posY = y;
+    return name;
 }
 
-// Set coordinates
-pair<int, int> Robot::getPosition() const
+int Robot::getHealth() const
 {
-    return make_pair(posX, posY); // Return the current (x,y) position
+    return health;
+}
+
+char Robot::getSymbol() const
+{
+    // return name.empty() ? '?' : name[0]; // Return the first character of the robot's name as its symbol
+    //  return name[0];
+    return 'R'; // Default symbol for the robot
+}
+
+void Robot::showInfo() const
+{
+    cout << "[" << name << "] at position (" << posX << ", " << posY << "), Health: " << health << endl;
 }
