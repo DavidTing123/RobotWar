@@ -14,13 +14,16 @@ Phone:  01151799588, 013-352 8910, 0162025996
 // #include <iostream>
 // #include <string>
 #include "Robot.h" // Include the base class header
+#include <vector>
+using namespace std;
 
 // Add your declarations here
-class SeeingRobot : virtual public Robot
+class SeeingRobot : public virtual Robot
 {
 public:
-    using Robot::Robot;
-    virtual void look(int dx, int dy) = 0;
+    SeeingRobot(const string &name, int x, int y)
+        : Robot(name, x, y) {}                             // Constructor initializing the base class
+    virtual vector<vector<char>> look(int dx, int dy) = 0; // Pure virtual function for seeing 8 directions
 };
 
 #endif // SEEING_H

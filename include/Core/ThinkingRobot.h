@@ -16,11 +16,13 @@ Phone:  01151799588, 013-352 8910, 0162025996
 #include "Robot.h" // Include the base class header
 
 // Add your declarations here
-class ThinkingRobot : virtual public Robot
+class ThinkingRobot : public virtual Robot
 {
 public:
-    using Robot::Robot;
-    virtual void makeDecision() = 0;
+    ThinkingRobot(const std::string &name, int x, int y)
+        : Robot(name, x, y) {}
+
+    virtual void think() = 0; // Perform logic thinking
 };
 
 #endif // THINKINGROBOT_H
