@@ -1,4 +1,4 @@
-#include <iostrean>
+#include "include//Core//GenericRobot.h"
 using namespace std;
 
 class GenericRobot(){
@@ -6,7 +6,7 @@ private:
     int moving = 0;
     int shooting = 0;
     int seeing = 0;
-public:
+
     
 }
 

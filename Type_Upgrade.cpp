@@ -50,7 +50,7 @@ public:
 };
 
 int main(){
-    std::string name;
+    string name;
     GenericRobot (name, 100, 100, 2);
 
 
