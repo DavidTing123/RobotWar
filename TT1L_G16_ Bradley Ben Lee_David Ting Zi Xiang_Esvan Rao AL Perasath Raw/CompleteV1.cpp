@@ -1,0 +1,1246 @@
+/**********|**********|**********|
+Program: Main.cpp
+Course: OOPDS
+Trimester: 2510
+Name: Bradley Ben Lee, David Ting Zi Xiang, Esvan Rao A/L Perasath Raw
+ID: 243UC245SA, 242UC244PE, 243UC245HJ
+Lecture Section: TC1L
+Tutorial Section: TT1L
+Email: BRADLEY.BEN.LEE@student.mmu.edu.my, DAVID.TING.ZI@student.mmu.edu.my, esvan.rao.perasath@student.mmu.edu.my
+Phone:  01151799588, 013-352 8910, 0162025996
+**********|**********|**********/
+
+#include <iostream>
+#include <vector>
+#include <string>
+#include <cstdlib>
+#include <ctime>
+#include <set>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <memory>
+#include <algorithm>
+
+using namespace std;
+using std::unique_ptr;
+using std::make_unique;
+
+// Forward declarations
+class Battlefield;
+class Robot;
+class GenericRobot;
+class Logger;
+class Simulation;
+class Parser;
+GenericRobot* Upgrade(GenericRobot* Bot, const string& category);
+
+// Constants
+const int MAP_WIDTH = 10;
+const int MAP_HEIGHT = 10;
+
+// Battlefield class
+class Battlefield {
+private:
+    int width, height;
+    std::vector<std::vector<Robot*>> grid;
+
+public:
+    Battlefield(int width, int height);
+    bool placeRobot(Robot* robot, int x, int y);
+    void removeRobot(int x, int y);
+    bool moveRobot(Robot* robot, int newX, int newY);
+    Robot* getRobotAt(int x, int y) const;
+    bool isValidPosition(int x, int y) const;
+    std::pair<int, int> getRandomEmptyCell() const;
+    void display() const;
+    int getWidth() const { return width; }
+    int getHeight() const { return height; }
+    bool hasRobotAt(int x, int y) const { return getRobotAt(x, y) != nullptr; }
+    void updatePosition(int oldX, int oldY, int newX, int newY);
+    Robot* getRandomAdjacentRobot(int x, int y) const;
+    void cleanUpDestroyedRobots();
+};
+
+// Robot base class
+class Robot {
+protected:
+    string name;
+    int lives;
+    bool destroyedThisRound = false;
+    int positionX, positionY;
+    Battlefield* battlefield;
+    vector<string> AddedUpgrades;
+    bool enemyFound = false;
+    int enemyX, enemyY;
+    string enemyName;
+    int kills = 0;
+    int shellsRemaining = 10;
+    bool needsUpgrade = false;
+    string upgradeCategory;
+
+public:
+    Robot(const string& name, Battlefield* battlefield)
+        : name(name), lives(3), battlefield(battlefield) {
+        positionX = rand() % battlefield->getWidth();
+        positionY = rand() % battlefield->getHeight();
+    }
+
+    virtual ~Robot() {}
+
+    virtual char getSymbol() const = 0;
+    virtual void think() = 0;
+    virtual void performMove() = 0;
+    virtual void look(int x, int y) = 0;
+    virtual void performFire(int x, int y) = 0;
+
+    virtual void respawn() {
+        lives = 3;
+        destroyedThisRound = false;
+        // Reset any temporary state flags
+        enemyFound = false;
+        shellsRemaining = 10;  // Reset ammo for new life
+    }
+
+    string getName() const { return name; }
+    bool isAlive() const { return lives > 0; }
+    void setLives(int l) { lives = l; }
+    int getLives() const { return lives; }
+    int getKills() const { return kills; }
+    int getX() const { return positionX; }
+    int getY() const { return positionY; }
+    void setPosition(int x, int y) { positionX = x; positionY = y; }
+    pair<int, int> getPosition() const { return {positionX, positionY}; }
+    bool isDestroyedThisRound() const { return destroyedThisRound; }
+    void setDestroyedThisRound(bool val) { destroyedThisRound = val; }
+    virtual bool canBeHit() const { return true; }
+    int getShellsRemaining() const { return shellsRemaining; }
+    const vector<string>& getAddedUpgrades() const { return AddedUpgrades; }
+    bool needsUpgradeNow() const { return needsUpgrade; }
+    string getUpgradeCategory() const { return upgradeCategory; }
+    void clearUpgradeFlag() { needsUpgrade = false; }
+
+    bool hasUpgrade(const string& category) const {
+        for (const auto& upgrade : AddedUpgrades) {
+            if (upgrade == category) return true;
+        }
+        return false;
+    }
+
+    void addUpgrade(const string& category) {
+        AddedUpgrades.push_back(category);
+    }
+
+    bool isWithinShootingRange(int enemyX, int enemyY) {
+        int dx = abs(enemyX - getX());
+        int dy = abs(enemyY - getY());
+        return (dx <= 1 && dy <= 1 && (dx != 0 || dy != 0));
+    }
+
+    void log(const string& message) {
+        cout << message;
+    }
+
+    virtual bool shouldUpgrade() const {
+        cout << getName() << " - Kills: " << kills
+             << ", Upgrades: " << AddedUpgrades.size()
+             << ", Needs Upgrade: " << needsUpgrade << endl;
+        return kills >= 1 && getAddedUpgrades().size() < 3;
+    }
+    void displayUpgrades() const {
+        cout << "Upgrades: ";
+        if (AddedUpgrades.empty()) {
+            cout << "None";
+        } else {
+            for (size_t i = 0; i < AddedUpgrades.size(); ++i) {
+                if (i != 0) cout << ", ";
+                cout << AddedUpgrades[i];
+            }
+        }
+        cout << endl;
+    }
+
+};
+
+// GenericRobot implementation
+class GenericRobot : public Robot {
+protected:
+    int range, firePower, moveDistance, vision;
+
+public:
+    GenericRobot(string name, Battlefield* battlefield)
+        : Robot(name, battlefield), range(1), firePower(1), moveDistance(1), vision(2) {}
+
+    char getSymbol() const override {
+        return '@';
+    }
+
+    int getRange() const { return range; }
+    int getFirePower() const { return firePower; }
+    int getMoveDistance() const { return moveDistance; }
+    int getVision() const { return vision; }
+    set<string> upgradeCategories;
+
+    void think() override {
+        enemyFound = false; // Reset enemy detection at start of turn
+
+        log(getName() + " is looking around...\n");
+
+        // Look in all adjacent positions (including diagonals)
+        for (int dx = -1; dx <= 1; ++dx) {
+            for (int dy = -1; dy <= 1; ++dy) {
+                if (dx == 0 && dy == 0) continue; // Skip self
+
+                int lookX = getX() + dx;
+                int lookY = getY() + dy;
+
+                if (battlefield->isValidPosition(lookX, lookY)) {
+                    look(lookX, lookY);
+                }
+            }
+        }
+
+        if (enemyFound && isWithinShootingRange(enemyX, enemyY)) {
+            performFire(enemyX, enemyY);
+        } else {
+            performMove();
+        }
+    }
+
+    void performMove() override {
+        int attempts = 0;
+        const int maxAttempts = 20;
+
+        while (attempts < maxAttempts) {
+            int x = rand() % 3 - 1; // -1, 0, 1
+            int y = rand() % 3 - 1; // -1, 0, 1
+
+            // Skip if both x and y are 0 (no movement)
+            if (x == 0 && y == 0) {
+                attempts++;
+                continue;
+            }
+
+            int newX = getX() + x;
+            int newY = getY() + y;
+
+            if (newX >= 0 && newX < battlefield->getWidth() &&
+                newY >= 0 && newY < battlefield->getHeight() &&
+                !battlefield->hasRobotAt(newX, newY)) {
+
+                battlefield->updatePosition(getX(), getY(), newX, newY);
+                return;
+            }
+
+            attempts++;
+        }
+
+        // If all attempts fail, stay in place
+        log(getName() + " could not find a safe place to move!\n");
+    }
+
+    void look(int x, int y) override {
+        Robot* target = battlefield->getRobotAt(x, y);
+        if (target && target != this && target->isAlive()) {
+            enemyFound = true;
+            enemyX = x;
+            enemyY = y;
+            enemyName = target->getName();
+
+            log(getName() + " found " + enemyName + " at (" + to_string(enemyX) + ", " + to_string(enemyY) + ")!\n");
+        }
+    }
+
+    void performFire(int x, int y) override {
+    if (shellsRemaining <= 0) {
+        log("\n" + getName() + " is out of shells and self-destructs!\n");
+        setDestroyedThisRound(true);
+        battlefield->removeRobot(getX(), getY());
+        setLives(0);
+        return;
+    }
+
+    Robot* target = battlefield->getRobotAt(x, y);
+    if (target && target != this && target->isAlive()) {
+        log("\n" + getName() + " FIRES at " + target->getName() + " at (" +
+            to_string(x) + ", " + to_string(y) + ")!\n");
+
+        if (!target->canBeHit()) {
+            log(target->getName() + " avoided the attack (cannot be hit)!\n");
+        } else {
+            int newLives = target->getLives() - 1;  // Decrement lives
+            target->setLives(newLives);
+
+            if (newLives <= 0) {
+                log("DIRECT HIT! " + target->getName() + " is destroyed!\n");
+                target->setDestroyedThisRound(true);
+                battlefield->removeRobot(x, y);
+                kills++;
+
+                // Set upgrade flag based on kill count
+                if (kills == 1 && !hasUpgradeCategory("Moving")) {
+                    needsUpgrade = true;
+                    upgradeCategory = "Moving";
+                } else if (kills == 2 && !hasUpgradeCategory("Shooting")) {
+                    needsUpgrade = true;
+                    upgradeCategory = "Shooting";
+                } else if (kills >= 3 && !hasUpgradeCategory("Seeing")) {
+                    needsUpgrade = true;
+                    upgradeCategory = "Seeing";
+                }
+            } else {
+                log("HIT! " + target->getName() + " has " + to_string(newLives) + " lives remaining!\n");
+            }
+        }
+        shellsRemaining--;
+    } else {
+        log("\n" + getName() + " fired at empty space at (" + to_string(x) + ", " + to_string(y) + ").\n");
+        shellsRemaining--;
+    }
+}
+
+    bool canUpgrade(const string& category) const {
+        return upgradeCategories.find(category) == upgradeCategories.end();
+    }
+
+    bool hasUpgradeCategory(const string& category) const {
+    return upgradeCategories.count(category) > 0;
+    }
+
+    void markUpgraded(const string& category) {
+    upgradeCategories.insert(category);  // Track the category only here
+    // Don't add the category to AddedUpgrades here
+    }
+
+    bool hasUpgrade(const string& upgradeName) const {
+    for (const auto& upgrade : AddedUpgrades) {
+        if (upgrade == upgradeName) return true;
+    }
+    return false;
+}
+bool shouldUpgrade() const override {
+    if (kills > 0 && upgradeCategories.size() < 3) {
+        if (kills == 1 && !hasUpgradeCategory("Moving")) return true;
+        if (kills == 2 && !hasUpgradeCategory("Shooting")) return true;
+        if (kills >= 3 && !hasUpgradeCategory("Seeing")) return true;
+    }
+    return false;
+}
+};
+
+// Moving type Upgrades (HideBot, jumpBot, FastBot)
+namespace Moving {
+    class HideBot : public GenericRobot {
+    public:
+        int Hide = 3;
+        bool Invi = false;
+
+        HideBot(GenericRobot* base) : GenericRobot(*base) {
+            cout << "** Upgraded to HIDE-BOT! **"<<endl;
+            cout << "| Can now hide from enemies |"<<endl;
+            addUpgrade("HideBot");
+            markUpgraded("Moving");
+        }
+
+        void Hidden() {
+            if (Hide > 0) {
+                Hide--;
+                Invi = true;
+                cout << "HideBot is hiding and can't be detected by other bots... Hides left: " << Hide << endl;
+            } else {
+                Invi = false; // Make sure it's visible when out of hides
+                cout << "HideBot has used up all its 'Hides'..." << endl;
+            }
+        }
+
+        bool canBeHit() const override { return !Invi; }
+
+        void performMove() override {
+            Hidden();
+            GenericRobot::performMove();
+        }
+    };
+
+    class JumpBot : public GenericRobot {
+    public:
+        int Jumps = 3;
+
+        JumpBot(GenericRobot* base) : GenericRobot(*base) {
+            cout<<"** Upgraded to JUMP-BOT! **"<<endl;
+            cout<<"| Can now jump to anywhere in the map |"<<endl;
+            addUpgrade("JumpBot");
+            markUpgraded("Moving");
+        }
+
+        void jump() {
+            if (Jumps > 0) {
+                Jumps--;
+                int attempts = 0;
+                const int maxAttempts = 10;
+
+                while (attempts < maxAttempts) {
+                    int newX = rand() % battlefield->getWidth();
+                    int newY = rand() % battlefield->getHeight();
+
+                    if (!battlefield->hasRobotAt(newX, newY)) {
+                        battlefield->updatePosition(getX(), getY(), newX, newY);
+                        cout << "Jumpbot used 'Jump' and landed at (" << newX << ", " << newY << ")... Jumps left: " << Jumps << endl;
+                        return;
+                    }
+                    attempts++;
+                }
+                cout << "Jumpbot couldn't find a safe spot to land!" << endl;
+            } else {
+                cout << "Jumpbot has ran out of 'Jumps'..." << endl;
+            }
+        }
+
+        void performMove() override {
+            jump();
+        }
+    };
+
+    class FastBot : public GenericRobot {
+    public:
+        int movement = 3;
+
+        FastBot(GenericRobot* base) : GenericRobot(*base) {
+            cout<<"** Upgraded to FAST-BOT! **"<<endl;
+            cout<<"| Can now move 3 block ahead in one move |"<<endl;
+            addUpgrade("FastBot");
+            markUpgraded("Moving");
+        }
+
+        void FastMove() {
+            if (movement > 0) {
+                movement--;
+                moveDistance = 3;
+                cout << "Fastbot used 'Fast Move' and quickly moved ahead... Fast Moves left: " << movement << endl;
+            } else {
+                cout << "Fastbot ran out of 'Fast Moves'... " << endl;
+            }
+        }
+
+        void performMove() override {
+            FastMove();
+            int attempts = 0;
+            const int maxAttempts = 20;
+
+            while (attempts < maxAttempts) {
+                int x = rand() % (2 * moveDistance + 1) - moveDistance; // -moveDistance to +moveDistance
+                int y = rand() % (2 * moveDistance + 1) - moveDistance;
+
+                // Skip if both x and y are 0 (no movement)
+                if (x == 0 && y == 0) {
+                    attempts++;
+                    continue;
+                }
+
+                int newX = getX() + x;
+                int newY = getY() + y;
+
+                if (newX >= 0 && newX < battlefield->getWidth() &&
+                    newY >= 0 && newY < battlefield->getHeight() &&
+                    !battlefield->hasRobotAt(newX, newY)) {
+
+                    battlefield->updatePosition(getX(), getY(), newX, newY);
+                    return;
+                }
+
+                attempts++;
+            }
+
+            // If all attempts fail, stay in place
+            log(getName() + " could not find a safe place to move!\n");
+        }
+    };
+}
+
+// Shooting type Upgrades (LongShot, SemiAutoBot, BomberBot)
+namespace Shooting {
+    class LongShotBot : public GenericRobot {
+    public:
+        LongShotBot(GenericRobot* base) : GenericRobot(*base) {
+            range = 3;
+            shellsRemaining = 13;
+            cout << "** You are now upgraded to LONGSHOT-BOT! **" << endl;
+            cout << "| EXTRA BULLETS ACQUIRED |" << endl;
+            addUpgrade("LongShotBot");
+            markUpgraded("Shooting");
+        }
+    };
+
+    class SemiAutoBot : public GenericRobot {
+    public:
+        SemiAutoBot(GenericRobot* base) : GenericRobot(*base) {
+        firePower = 3;
+        shellsRemaining = 15;
+        cout << "** Upgraded to SEMI-AUTO-BOT! **" << endl;
+        cout << "| Fires 3 bullets (70% hit chance each) |" << endl;
+        addUpgrade("SemiAutoBot");
+        markUpgraded("Shooting");
+    }
+
+    void performFire(int x, int y) override {
+        Robot* target = battlefield->getRobotAt(x, y);
+        if (!target || target == this || !target->isAlive()) {
+            GenericRobot::performFire(x, y);
+            return;
+        }
+
+        cout << getName() << " fires 3 bullets at " << target->getName() << "!\n";
+
+        int hits = 0;
+        for (int i = 0; i < 3; i++) {
+            if (rand() % 100 < 70 && target->canBeHit()) {
+                hits++;
+            }
+        }
+
+        shellsRemaining -= 3;
+
+        if (hits > 0) {
+            target->setLives(target->getLives() - hits);
+            if (target->getLives() <= 0) {
+                cout << "Destroyed " << target->getName() << " with " << hits << " hits!\n";
+                battlefield->removeRobot(x, y);
+                kills++;
+            } else {
+                cout << hits << " hits! " << target->getName() << " has "
+                     << target->getLives() << " lives left.\n";
+            }
+        } else {
+            cout << "All shots missed!\n";
+        }
+    }
+};
+
+    class BomberBot : public GenericRobot {
+    public:
+        int Bombs = 3;
+
+        BomberBot(GenericRobot* base) : GenericRobot(*base) {
+            shellsRemaining = 13;
+            cout << "** Upgraded to BOMBER-BOT! **" << endl;
+            cout << "| EXTRA BULLETS ACQUIRED |" << endl;
+            cout << "| Can now deal area damage bomb anywhere in the map |" << endl;
+            addUpgrade("BomberBot");
+            markUpgraded("Shooting");
+        }
+
+        void Bombing() {
+            if (Bombs > 0) {
+                Bombs--;
+                int bombX = rand() % battlefield->getWidth();
+                int bombY = rand() % battlefield->getHeight();
+
+                cout << "BomberBot has dropped a bomb at (" << bombX << ", " << bombY << ")... Bombs left: " << Bombs << endl;
+
+                // Check all robots in the 3x3 area around the bomb
+                for (int x = max(0, bombX-1); x <= min(battlefield->getWidth()-1, bombX+1); ++x) {
+                    for (int y = max(0, bombY-1); y <= min(battlefield->getHeight()-1, bombY+1); ++y) {
+                        Robot* target = battlefield->getRobotAt(x, y);
+                        if (target && target != this && target->isAlive()) {
+                            int hit = rand() % 100;
+                            if (hit < 50) {
+                                cout << ">> Hit! " << target->getName() << " was hit by the bomb!\n";
+                                target->setDestroyedThisRound(true);
+                                target->setLives(0);
+                                battlefield->removeRobot(x, y);
+                            } else {
+                                cout << ">> Miss! " << target->getName() << " avoided the bomb!\n";
+                            }
+                        }
+                    }
+                }
+            } else {
+                cout << "BomberBot ran out of Bombs..." << endl;
+            }
+        }
+
+        void performFire(int x, int y) override {
+            Bombing();
+        }
+    };
+}
+
+// Seeing type Upgrades (ScoutBot, TrackBot, VisionBot)
+namespace Seeing {
+    class ScoutBot : public GenericRobot {
+    public:
+        int scans = 3;
+        bool BattlefieldScanned = false;
+
+        ScoutBot(GenericRobot* base) : GenericRobot(*base) {
+            cout << "** Upgraded to SCOUT-BOT! **" << endl;
+            cout << "| Can now Scan the whole map |" << endl;
+            addUpgrade("ScoutBot");
+            markUpgraded("Seeing");
+        }
+
+        void Scan_Battlefield() {
+            if (scans > 0) {
+                scans--;
+                BattlefieldScanned = true;
+                cout << "ScoutBot uses 'Scan' to reveal battlefield... Scans left: " << scans << endl;
+
+                // Display all robots' positions
+                for (int x = 0; x < battlefield->getWidth(); ++x) {
+                    for (int y = 0; y < battlefield->getHeight(); ++y) {
+                        Robot* robot = battlefield->getRobotAt(x, y);
+                        if (robot && robot->isAlive()) {
+                            cout << "Robot " << robot->getName() << " at (" << x << ", " << y << ")\n";
+                        }
+                    }
+                }
+            } else {
+                cout << "Scoutbot has used up all 'Scans'..." << endl;
+            }
+        }
+
+        void performMove() override {
+            Scan_Battlefield();
+            GenericRobot::performMove();
+        }
+    };
+
+    class TrackBot : public GenericRobot {
+    public:
+        int trackers = 3;
+
+        TrackBot(GenericRobot* base) : GenericRobot(*base) {
+            cout << "** Upgraded to TRACK-BOT! **" << endl;
+            cout << "| Can now Track enemies in the map |" << endl;
+            addUpgrade("TrackBot");
+            markUpgraded("Seeing");
+        }
+
+        void Track_Bots() {
+            if (trackers > 0) {
+                trackers--;
+
+                vector<Robot*> validTargets;
+                for (int x = 0; x < battlefield->getWidth(); ++x) {
+                    for (int y = 0; y < battlefield->getHeight(); ++y) {
+                        Robot* robot = battlefield->getRobotAt(x, y);
+                        if (robot && robot != this && robot->isAlive()) {
+                            validTargets.push_back(robot);
+                        }
+                    }
+                }
+
+                if (!validTargets.empty()) {
+                    int index = rand() % validTargets.size();
+                    Robot* target = validTargets[index];
+                    cout << "TrackBot planted a tracker on " << target->getName()
+                         << " at (" << target->getX() << ", " << target->getY() << ")\n";
+                    enemyFound = true;
+                    enemyX = target->getX();
+                    enemyY = target->getY();
+                    enemyName = target->getName();
+                } else {
+                    cout << "No enemies to track." << endl;
+                }
+
+                cout << "Trackers left: " << trackers << endl;
+            } else {
+                cout << "TrackBot ran out of 'trackers'..." << endl;
+            }
+        }
+
+        void performMove() override {
+            Track_Bots();
+            GenericRobot::performMove();
+        }
+    };
+
+    class VisionBot : public GenericRobot {
+    public:
+        VisionBot(GenericRobot* base) : GenericRobot(*base) {
+            vision += 2;
+            cout << "** You are now upgraded to VISION-BOT! **" << endl;
+            cout << "| Vision has been increased |" << endl;
+            addUpgrade("VisionBot");
+            markUpgraded("Seeing");
+        }
+    };
+}
+
+// GenericRobot Upgrades
+GenericRobot* Upgrade(GenericRobot* Bot, const string& category) {
+    if (Bot->hasUpgradeCategory(category)) {
+        cout << Bot->getName() << " already has a " << category << " upgrade!" << endl;
+        return Bot;
+    }
+
+    GenericRobot* upgradedBot = Bot;
+    int RandUpgrades = rand() % 3;
+
+    if (category == "Moving") {
+        vector<int> available;
+        if (!Bot->hasUpgrade("HideBot")) available.push_back(0);
+        if (!Bot->hasUpgrade("JumpBot")) available.push_back(1);
+        if (!Bot->hasUpgrade("FastBot")) available.push_back(2);
+
+        if (!available.empty()) {
+            RandUpgrades = available[rand() % available.size()];
+            switch(RandUpgrades) {
+                case 0: upgradedBot = new Moving::HideBot(Bot); break;
+                case 1: upgradedBot = new Moving::JumpBot(Bot); break;
+                case 2: upgradedBot = new Moving::FastBot(Bot); break;
+            }
+        }
+    }
+    else if (category == "Shooting") {
+        vector<int> available;
+        if (!Bot->hasUpgrade("LongShotBot")) available.push_back(0);
+        if (!Bot->hasUpgrade("SemiAutoBot")) available.push_back(1);
+        if (!Bot->hasUpgrade("BomberBot")) available.push_back(2);
+
+        if (!available.empty()) {
+            RandUpgrades = available[rand() % available.size()];
+            switch(RandUpgrades) {
+                case 0: upgradedBot = new Shooting::LongShotBot(Bot); break;
+                case 1: upgradedBot = new Shooting::SemiAutoBot(Bot); break;
+                case 2: upgradedBot = new Shooting::BomberBot(Bot); break;
+            }
+        }
+    }
+    else if (category == "Seeing") {
+        vector<int> available;
+        if (!Bot->hasUpgrade("ScoutBot")) available.push_back(0);
+        if (!Bot->hasUpgrade("TrackBot")) available.push_back(1);
+        if (!Bot->hasUpgrade("VisionBot")) available.push_back(2);
+
+        if (!available.empty()) {
+            RandUpgrades = available[rand() % available.size()];
+            switch(RandUpgrades) {
+                case 0: upgradedBot = new Seeing::ScoutBot(Bot); break;
+                case 1: upgradedBot = new Seeing::TrackBot(Bot); break;
+                case 2: upgradedBot = new Seeing::VisionBot(Bot); break;
+            }
+        }
+    }
+    if (upgradedBot != Bot) {
+        upgradedBot->markUpgraded(category);
+    }
+
+    return upgradedBot;
+}
+
+// Logger class
+class Logger {
+private:
+    std::ofstream logFile;
+    std::string getCurrentTimestamp();
+
+public:
+    Logger(const std::string& filename);
+    ~Logger();
+    void log(const std::string& message);
+};
+
+Logger::Logger(const std::string& filename) {
+    logFile.open(filename);
+}
+
+Logger::~Logger() {
+    if (logFile.is_open()) {
+        logFile.close();
+    }
+}
+
+std::string Logger::getCurrentTimestamp() {
+    auto now = std::time(nullptr);
+    auto tm = *std::localtime(&now);
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "[%Y-%m-%d %H:%M:%S]");
+    return oss.str();
+}
+
+void Logger::log(const std::string& message) {
+    if (logFile.is_open()) {
+        logFile << getCurrentTimestamp() << " " << message << "\n";
+    }
+}
+
+// Battlefield implementation
+Battlefield::Battlefield(int width, int height)
+    : width(width), height(height) {
+    grid.resize(width, std::vector<Robot*>(height, nullptr));
+}
+
+bool Battlefield::placeRobot(Robot* robot, int x, int y) {
+    if (!isValidPosition(x, y) || grid[x][y] != nullptr) {
+        return false;
+    }
+    grid[x][y] = robot;
+    robot->setPosition(x, y);
+    return true;
+}
+
+void Battlefield::removeRobot(int x, int y) {
+    if (isValidPosition(x, y)) {
+        grid[x][y] = nullptr;
+    }
+}
+
+bool Battlefield::moveRobot(Robot* robot, int newX, int newY) {
+    auto [currX, currY] = robot->getPosition();
+    if (!isValidPosition(newX, newY) || grid[newX][newY] != nullptr) {
+        return false;
+    }
+    grid[currX][currY] = nullptr;
+    grid[newX][newY] = robot;
+    robot->setPosition(newX, newY);
+    return true;
+}
+
+Robot* Battlefield::getRobotAt(int x, int y) const {
+    if (!isValidPosition(x, y)) return nullptr;
+    return grid[x][y];
+}
+
+bool Battlefield::isValidPosition(int x, int y) const {
+    return x >= 0 && x < width && y >= 0 && y < height;
+}
+
+std::pair<int, int> Battlefield::getRandomEmptyCell() const {
+    std::vector<std::pair<int, int>> emptyCells;
+    for (int x = 0; x < width; x++) {
+        for (int y = 0; y < height; y++) {
+            if (grid[x][y] == nullptr) {
+                emptyCells.emplace_back(x, y);
+            }
+        }
+    }
+    if (emptyCells.empty()) return {-1, -1};
+    return emptyCells[rand() % emptyCells.size()];
+}
+
+void Battlefield::display() const {
+    std::cout << "\nBattlefield (" << width << "x" << height << "):\n";
+
+    // Column headers - need extra space for two-digit numbers
+    std::cout << "   "; // Extra space for row numbers
+    for (int x = 0; x < width; x++) {
+        std::cout << std::setw(2) << x << " "; // Two-digit column numbers with space
+    }
+    std::cout << "\n";
+
+    // Grid with row numbers
+    for (int y = 0; y < height; y++) {
+        std::cout << std::setw(2) << y << " "; // Two-digit row number with space
+        for (int x = 0; x < width; x++) {
+            if (grid[x][y]) {
+                Robot* r = grid[x][y];
+                if (r->isAlive()) {
+                    std::cout << " " << r->getSymbol() << " "; // Robot symbol with spaces
+                }
+            } else {
+                std::cout << " . "; // Empty space with spaces
+            }
+        }
+        std::cout << "\n";
+    }
+}
+
+void Battlefield::updatePosition(int oldX, int oldY, int newX, int newY) {
+    if (isValidPosition(oldX, oldY) && isValidPosition(newX, newY)) {
+        Robot* robot = grid[oldX][oldY];
+        grid[oldX][oldY] = nullptr;
+        grid[newX][newY] = robot;
+        robot->setPosition(newX, newY);
+    }
+}
+
+Robot* Battlefield::getRandomAdjacentRobot(int x, int y) const {
+    vector<Robot*> adjacentRobots;
+    for (int dx = -1; dx <= 1; dx++) {
+        for (int dy = -1; dy <= 1; dy++) {
+            if (dx == 0 && dy == 0) continue; // Skip self
+            int nx = x + dx;
+            int ny = y + dy;
+            if (isValidPosition(nx, ny)) {
+                Robot* robot = grid[nx][ny];
+                if (robot && robot->isAlive()) {
+                    adjacentRobots.push_back(robot);
+                }
+            }
+        }
+    }
+    if (adjacentRobots.empty()) return nullptr;
+    return adjacentRobots[rand() % adjacentRobots.size()];
+}
+
+void Battlefield::cleanUpDestroyedRobots() {
+    for (int x = 0; x < width; x++) {
+        for (int y = 0; y < height; y++) {
+            Robot* robot = grid[x][y];
+            if (robot && !robot->isAlive()) {
+                grid[x][y] = nullptr;
+            }
+        }
+    }
+}
+
+// Simulation class
+class Simulation {
+private:
+    Battlefield battlefield;
+    int maxTurns;
+    int currentTurn = 0;
+    vector<unique_ptr<Robot>> robots;
+    vector<Robot*> robotsToUpgrade;
+    vector<string> upgradeCategories;
+
+     struct RespawnEntry {
+        unique_ptr<Robot> robot;
+        int respawnTurn;
+    };
+    vector<RespawnEntry> respawnQueue;
+    const int respawnDelay = 3;
+
+public:
+    Simulation(int width, int height, int maxTurns)
+        : battlefield(width, height), maxTurns(maxTurns) {}
+
+    void addRobot(unique_ptr<Robot> robot) {
+        auto [x, y] = battlefield.getRandomEmptyCell();
+        if (x != -1) {
+            battlefield.placeRobot(robot.get(), x, y);
+            robots.push_back(move(robot));
+        }
+    }
+
+    void addRobot(unique_ptr<Robot> robot, int x, int y) {
+        if (battlefield.placeRobot(robot.get(), x, y)) {
+            robots.push_back(move(robot));
+        }
+    }
+
+    Battlefield* getBattlefield() { return &battlefield; }
+
+    void run(const string& logFile) {
+        Logger logger(logFile);
+
+         std::cout << "=== ROBOT WAR===" << std::endl;
+        std::cout << "Starting with " << robots.size() << " robots\n";
+        std::cout << "Maximum turns: " << maxTurns << "\n\n";
+
+        for (currentTurn = 1; currentTurn <= maxTurns; currentTurn++) {
+        std::cout << "=== TURN " << currentTurn << " ===" << std::endl;
+        logger.log("=== Turn " + to_string(currentTurn) + " ===");
+        processUpgrades();
+        processTurn(logger);
+
+            if (robots.size() <= 1) break;
+            processRespawns(currentTurn);
+        }
+
+        // Game over message
+        std::cout << "\n=== ROBOT WAR RESULTS ===" << std::endl;
+        if (robots.empty()) {
+            std::cout << "All robots destroyed!" << std::endl;
+            logger.log("All robots destroyed!");
+        } else if (robots.size() == 1) {
+            std::cout << robots[0]->getName() << " is the last robot standing!" << std::endl;
+            logger.log(robots[0]->getName() + " is the last robot standing!");
+        } else {
+            std::cout << "ROBOT WAR ended with " << robots.size() << " robots remaining" << std::endl;
+            logger.log("ROBOT WAR ended with " + to_string(robots.size()) + " robots remaining");
+        }
+    }
+
+    void processRespawns(int currentTurn) {
+    for (auto it = respawnQueue.begin(); it != respawnQueue.end(); ) {
+        if (currentTurn >= it->respawnTurn) {
+            Robot* r = it->robot.get();
+            if (r->getLives() > 0) {  // Only respawn if lives remain
+                r->respawn();
+
+                // Find a random empty cell for respawn
+                int attempts = 0;
+                const int maxAttempts = 100; // Prevent infinite loops
+                bool placed = false;
+
+                while (attempts < maxAttempts && !placed) {
+                    // Generate random coordinates
+                    int x = rand() % battlefield.getWidth();
+                    int y = rand() % battlefield.getHeight();
+
+                    if (!battlefield.hasRobotAt(x, y)) {
+                        battlefield.placeRobot(r, x, y);
+                        cout << r->getName() << " has respawned at random position (" << x << ", " << y << ")\n";
+                        robots.push_back(move(it->robot));
+                        placed = true;
+                    }
+                    attempts++;
+                }
+
+                if (!placed) {
+                    cout << r->getName() << " could not find a valid respawn position!\n";
+                    // Keep in queue to try again next turn
+                    ++it;
+                    continue;
+                }
+
+                it = respawnQueue.erase(it);
+                continue;
+            } else {
+                // Permanently dead, remove from queue
+                it = respawnQueue.erase(it);
+                continue;
+            }
+        }
+        ++it;
+    }
+}
+
+    void processTurn(Logger& logger) {
+    battlefield.cleanUpDestroyedRobots();
+    battlefield.display();
+
+    // First remove any destroyed robots from previous turn
+    for (auto it = robots.begin(); it != robots.end(); ) {
+        if (!(*it)->isAlive()) {
+            if ((*it)->getLives() > 0) {  // Only queue for respawn if lives remain
+                logger.log((*it)->getName() + " has been destroyed! Waiting to respawn...");
+                battlefield.removeRobot((*it)->getX(), (*it)->getY());
+
+                RespawnEntry entry;
+                entry.robot = move(*it);
+                entry.respawnTurn = currentTurn + respawnDelay;
+                respawnQueue.push_back(move(entry));
+            } else {
+                logger.log((*it)->getName() + " has been permanently destroyed!");
+            }
+            it = robots.erase(it);
+        } else {
+            ++it;
+        }
+    }
+
+    // Check for upgrades before processing turns
+    for (auto& robot : robots) {
+        if (robot->isAlive() && robot->shouldUpgrade()) {
+            GenericRobot* gr = dynamic_cast<GenericRobot*>(robot.get());
+            if (gr) {
+                string category;
+                if (gr->getKills() == 1) category = "Moving";
+                else if (gr->getKills() == 2) category = "Shooting";
+                else if (gr->getKills() >= 3) category = "Seeing";
+                robot->displayUpgrades();
+
+                if (!gr->hasUpgradeCategory(category)) {
+                    queueUpgrade(robot.get(), category);
+                }
+            }
+        }
+    }
+
+    // Process upgrades before any moves
+    processUpgrades();
+    // Then process current turn
+    for (auto& robot : robots) {
+        if (robot->isAlive()) {
+            std::cout << "\n----------------------------------------\n";
+            auto [x, y] = robot->getPosition();
+
+            // Display robot stats
+            std::cout << "Name: " << robot->getName() << "\n";
+            std::cout << "Lives: " << robot->getLives() << "\n";
+
+            // For GenericRobot stats
+            GenericRobot* gr = dynamic_cast<GenericRobot*>(robot.get());
+            if (gr) {
+                std::cout << "Range: " << gr->getRange() << "\n";
+                std::cout << "Fire rate: " << gr->getFirePower() << "\n";
+                std::cout << "Bullets: " << robot->getShellsRemaining() << "\n";
+                std::cout << "Move: " << gr->getMoveDistance() << "\n";
+                std::cout << "Vision: " << gr->getVision() << "\n";
+            }
+
+            std::cout << "Position: (" << x << ", " << y << ")\n";
+
+            // Display upgrades
+            std::cout << "Upgrades: ";
+            const auto& upgrades = robot->getAddedUpgrades();
+            if (upgrades.empty()) {
+                std::cout << "None";
+            } else {
+                for (size_t i = 0; i < upgrades.size(); ++i) {
+                    if (i != 0) std::cout << ", ";
+                    std::cout << upgrades[i];
+                }
+            }
+            std::cout << "\n";
+
+            logger.log(robot->getName() + "'s turn at (" + to_string(x) + "," + to_string(y) + ")");
+
+            // Check for upgrades before processing the turn
+            if (robot->needsUpgradeNow()) {
+                queueUpgrade(robot.get(), robot->getUpgradeCategory());
+                robot->clearUpgradeFlag();
+            }
+
+            // Process robot's turn
+            robot->think();
+            std::cout << "----------------------------------------\n";
+        }
+    }
+}
+
+void processUpgrades() {
+    for (size_t i = 0; i < robotsToUpgrade.size(); ++i) {
+        GenericRobot* base = dynamic_cast<GenericRobot*>(robotsToUpgrade[i]);
+        if (base && base->isAlive()) {
+            cout << "Processing upgrade for " << base->getName()
+                 << " in category: " << upgradeCategories[i] << endl;
+
+            GenericRobot* upgraded = Upgrade(base, upgradeCategories[i]);
+            if (upgraded != base) {
+                // Find the robot in our vector
+                auto it = find_if(robots.begin(), robots.end(),
+                    [base](const unique_ptr<Robot>& r) { return r.get() == base; });
+
+                if (it != robots.end()) {
+                    // Update battlefield first
+                    battlefield.removeRobot(base->getX(), base->getY());
+                    it->reset(upgraded);
+                    battlefield.placeRobot(upgraded, upgraded->getX(), upgraded->getY());
+
+                    cout << "Successfully upgraded " << upgraded->getName() << endl;
+                }
+            }
+        }
+    }
+    robotsToUpgrade.clear();
+    upgradeCategories.clear();
+}
+
+
+    void queueUpgrade(Robot* robot, const string& category) {
+        robotsToUpgrade.push_back(robot);
+        upgradeCategories.push_back(category);
+    }
+
+};
+
+// Parser and config structures
+struct RobotInit {
+    std::string type;
+    std::string name;
+    int x, y;
+    bool randomPosition;
+};
+
+struct SimulationConfig {
+    int width, height;
+    int maxTurns;
+    std::vector<RobotInit> robots;
+};
+
+class Parser {
+public:
+    static SimulationConfig parseConfig(const std::string& filename);
+};
+
+SimulationConfig Parser::parseConfig(const std::string& filename) {
+    std::ifstream file(filename);
+    SimulationConfig config;
+    std::string line;
+
+    while (std::getline(file, line)) {
+        // Remove leading/trailing whitespace
+        line.erase(0, line.find_first_not_of(" \t"));
+        line.erase(line.find_last_not_of(" \t") + 1);
+
+        if (line.empty() || line[0] == '#') continue;
+
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos) {
+            std::string key = line.substr(0, colonPos);
+            // Remove whitespace from key
+            key.erase(std::remove_if(key.begin(), key.end(), ::isspace), key.end());
+
+            std::string value = line.substr(colonPos + 1);
+            // Remove leading whitespace from value
+            value.erase(0, value.find_first_not_of(" \t"));
+
+            if (key == "MbyN") {
+                std::istringstream iss(value);
+                iss >> config.width >> config.height;
+            } else if (key == "steps") {
+                config.maxTurns = std::stoi(value);
+            }
+        } else {
+            // Parse robot line
+            std::istringstream iss(line);
+            RobotInit robot;
+
+            // First word is always the type
+            iss >> robot.type;
+
+            // The rest of the line until "random" or coordinates is the name
+            std::string namePart;
+            robot.name = "";
+            while (iss >> namePart) {
+                if (namePart == "random") {
+                    robot.randomPosition = true;
+                    robot.x = robot.y = -1;
+                    break;
+                } else if (isdigit(namePart[0])) {
+                    // This is the x coordinate
+                    robot.randomPosition = false;
+                    robot.x = std::stoi(namePart);
+                    iss >> robot.y;
+                    break;
+                } else {
+                    if (!robot.name.empty()) {
+                        robot.name += " ";
+                    }
+                    robot.name += namePart;
+                }
+            }
+            config.robots.push_back(robot);
+        }
+    }
+    return config;
+}
+
+int main(int argc, char* argv[]) {
+    srand(time(nullptr));
+
+    try {
+        std::string configFile = (argc > 1) ? argv[1] : "config.txt";
+        std::string logFile = (argc > 2) ? argv[2] : "robot_war.log";
+        //std::string logFile = (argc > 2) ? argv[2] : "robot_war1.log";
+        //std::string logFile = (argc > 2) ? argv[2] : "robot_war2.log";
+
+        SimulationConfig config = Parser::parseConfig(configFile);
+
+        // Ensure minimum battlefield size
+        if (config.width <= 0) config.width = MAP_WIDTH;
+        if (config.height <= 0) config.height = MAP_HEIGHT;
+
+        Simulation sim(config.width, config.height, config.maxTurns);
+
+        for (const auto& robotCfg : config.robots) {
+            auto robot = make_unique<GenericRobot>(robotCfg.name, sim.getBattlefield());
+            if (robotCfg.randomPosition) {
+                sim.addRobot(move(robot));
+            } else {
+                sim.addRobot(move(robot), robotCfg.x, robotCfg.y);
+            }
+        }
+
+        sim.run(logFile);
+        std::cout << "Robot War End. Results logged to " << logFile << "\n";
+
+    } catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << "\n";
+        return 1;
+    }
+    return 0;
+}

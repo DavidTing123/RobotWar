@@ -1,0 +1,10 @@
+# Battlefield dimensions
+MbyN: 10 10
+
+# Maximum turns
+steps: 1000
+
+# Robot configurations
+Generic Robot1 random
+Generic Robot2 5 5
+Generic Robot3 2 8
